@@ -29,15 +29,14 @@ CHANNELS = [
     },
     {
         "name": "🍃 Join", 
-        "link": "https://youtube.com/@islamiczafranx?si=X6ZMfwKIejsZX6mW",
-        "id": -1002901037301
+        "link": "https://t.me/+Mk2X42Xsh6o3MDVl",
+        "id": -1002901037301  # CHANGE THIS TO ACTUAL SECOND CHANNEL ID
     }
 ]
 
 # Photo URLs - Replace with your actual photo URLs
-WELCOME_PHOTO = ""
-WARNING_PHOTO = ""
-
+WELCOME_PHOTO = none
+WARNING_PHOTO = none
 # User states and message tracking
 user_states = {}
 user_messages = {}
@@ -386,12 +385,19 @@ Verification pending...
 <blockquote><i>Note: For educational use only.</i></blockquote>
     """
 
-    welcome_message = await update.message.reply_photo(
-        photo=WELCOME_PHOTO,
-        caption=caption,
-        reply_markup=reply_markup,
-        parse_mode='HTML'
-    )
+    if WELCOME_PHOTO:
+        welcome_message = await update.message.reply_photo(
+            photo=WELCOME_PHOTO,
+            caption=caption,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+    else:
+        welcome_message = await update.message.reply_text(
+            caption,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
 
     user_messages[user_id]['welcome_message'] = welcome_message.message_id
 
@@ -854,13 +860,21 @@ You <b>must not</b> use this tool to access any account without proper permissio
 Misuse may result in <u>legal actions</u>, permanent bans 🚫, or other consequences.  
 Using this bot means you have <b>read and accepted</b> all the above terms.</i>"""
     
-    terms_message = await context.bot.send_photo(
-        chat_id=query.message.chat_id,
-        photo=WARNING_PHOTO,
-        caption=caption,
-        reply_markup=reply_markup,
-        parse_mode='HTML'
-    )
+    if WARNING_PHOTO:
+        terms_message = await context.bot.send_photo(
+            chat_id=query.message.chat_id,
+            photo=WARNING_PHOTO,
+            caption=caption,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+    else:
+        terms_message = await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=caption,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
     
     if user_id not in user_messages:
         user_messages[user_id] = {}
@@ -1026,21 +1040,32 @@ def main() -> None:
     # Initialize JSON database
     init_database()
     
-    # Create the Application
-    application = Application.builder().token(BOT_TOKEN).build()
+    try:
+        # Create the Application
+        application = Application.builder().token(BOT_TOKEN).build()
 
-    # Add handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("admin", admin_panel))
-    application.add_handler(CallbackQueryHandler(handle_callback_query))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(
-        MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, handle_message)
-    )
+        # Add handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("admin", admin_panel))
+        application.add_handler(CallbackQueryHandler(handle_callback_query))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_handler(
+            MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, handle_message)
+        )
 
-    # Run the bot
-    print("🚀 HackVerse OS Bot with JSON Database is starting...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+        # Run the bot
+        print("🚀 HackVerse OS Bot with JSON Database is starting...")
+        print(f"🤖 Bot Token: {BOT_TOKEN[:10]}...")
+        print(f"📊 Admin IDs: {ADMIN_USER_IDS}")
+        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+        
+    except Exception as e:
+        logger.error(f"Failed to start bot: {e}")
+        print(f"❌ Error: {e}")
+        print("\n💡 Solutions:")
+        print("1. Check if bot token is valid")
+        print("2. Install correct version: pip install python-telegram-bot==20.7")
+        print("3. Check channel IDs are valid Telegram channel IDs")
 
 if __name__ == '__main__':
     main()
