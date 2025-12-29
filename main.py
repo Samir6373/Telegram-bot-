@@ -35,8 +35,8 @@ CHANNELS = [
 ]
 
 # Photo URLs - Replace with your actual photo URLs
-WELCOME_PHOTO = none
-WARNING_PHOTO = none
+WELCOME_PHOTO = "https://ibb.co/ZpgPZxbN"
+WARNING_PHOTO = "https://ibb.co/ZpgPZxbN"
 # User states and message tracking
 user_states = {}
 user_messages = {}
