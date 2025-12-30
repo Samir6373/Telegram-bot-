@@ -2,70 +2,50 @@ import logging
 import json
 import os
 import asyncio
-import sys
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from telegram.constants import ParseMode
 
-# PythonAnywhere के लिए path setup
-if 'PYTHONANYWHERE_DOMAIN' in os.environ:
-    BASE_DIR = '/home/yourusername/HackVerseBot'
-    # अपना actual username डालें
-else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Bot token - Use environment variable for security
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8251978557:AAGlFfxZ1bBho1oQufAFLn8OeSmHHII92JY")
 
-# Bot token - Environment variable से लें
-BOT_TOKEN = os.environ.get('BOT_TOKEN', "8251978557:AAGlFfxZ1bBho1oQufAFLn8OeSmHHII92JY")
-
-# Admin user IDs
-admin_ids = os.environ.get('ADMIN_USER_IDS', '8301619548')
-ADMIN_USER_IDS = [int(x.strip()) for x in admin_ids.split(',') if x.strip().isdigit()]
+# Admin user IDs - Replace with actual admin user IDs
+ADMIN_USER_IDS = [8301619548]  # Add your admin user IDs here
 
 # Configure logging
-log_dir = os.path.join(BASE_DIR, 'logs')
-os.makedirs(log_dir, exist_ok=True)
-
-log_file = os.path.join(log_dir, 'bot.log')
 logging.basicConfig(
-    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file, encoding='utf-8'),
-        logging.StreamHandler(sys.stdout)
-    ]
+    level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# Channel configuration - अपने actual channel IDs डालें
+# Channel configuration - Replace with your actual channel data
 CHANNELS = [
     {
         "name": "☘️ Join",
         "link": "https://t.me/refarandearnchainnal",
-        "id": -1002901037301  # ACTUAL CHANNEL ID डालें
+        "id": -1002901037301
     },
     {
         "name": "🍃 Join", 
         "link": "https://t.me/+Mk2X42Xsh6o3MDVl",
-        "id": -1002901037301  # ACTUAL CHANNEL ID डालें
+        "id": -1002901037301  # CHANGE THIS TO ACTUAL SECOND CHANNEL ID
     }
 ]
 
-# Photo URLs - None रखें या online URLs डालें
+# Photo URLs - Replace with your actual photo URLs
 WELCOME_PHOTO = None
 WARNING_PHOTO = None
-
-# JSON Database file paths
-data_dir = os.path.join(BASE_DIR, 'data')
-os.makedirs(data_dir, exist_ok=True)
-
-USERS_DB_FILE = os.path.join(data_dir, "users_database.json")
-BROADCAST_STATS_FILE = os.path.join(data_dir, "broadcast_stats.json")
 
 # User states and message tracking
 user_states = {}
 user_messages = {}
 broadcast_states = {}
+
+# JSON Database file paths
+USERS_DB_FILE = "data/users_database.json"
+BROADCAST_STATS_FILE = "data/broadcast_stats.json"
 
 class UserState:
     CHANNEL_CHECK = "channel_check"
@@ -84,6 +64,9 @@ def load_json_file(filename, default_data=None):
         default_data = {}
     
     try:
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        
         if os.path.exists(filename):
             with open(filename, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -101,6 +84,7 @@ def load_json_file(filename, default_data=None):
 def save_json_file(filename, data):
     """Save data to JSON file with error handling"""
     try:
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False, default=str)
         return True
@@ -149,18 +133,18 @@ def add_user_to_db(user_id, username, first_name, last_name):
         if user_id_str in data["users"]:
             # Update existing user
             data["users"][user_id_str].update({
-                "username": username or "",
-                "first_name": first_name or "",
-                "last_name": last_name or "",
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
                 "last_activity": current_time
             })
         else:
             # Add new user
             data["users"][user_id_str] = {
                 "user_id": user_id,
-                "username": username or "",
-                "first_name": first_name or "",
-                "last_name": last_name or "",
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
                 "join_date": current_time,
                 "last_activity": current_time,
                 "is_banned": False
@@ -207,15 +191,11 @@ def get_all_users():
     """Get all active user IDs"""
     try:
         data = load_json_file(USERS_DB_FILE)
-        active_users = []
-        for user_data in data["users"].values():
-            try:
-                if not user_data.get("is_banned", False):
-                    user_id = user_data.get("user_id")
-                    if user_id:
-                        active_users.append(int(user_id))
-            except (ValueError, TypeError):
-                continue
+        active_users = [
+            int(user_data["user_id"]) 
+            for user_data in data["users"].values() 
+            if not user_data.get("is_banned", False)
+        ]
         return active_users
     except Exception as e:
         logger.error(f"Error getting all users: {e}")
@@ -309,9 +289,8 @@ def get_user_analytics():
                     last_activity = datetime.fromisoformat(last_activity_str).date()
                     if last_activity == current_date and not user.get("is_banned", False):
                         today_active += 1
-                        
-            except (ValueError, TypeError, AttributeError) as e:
-                logger.debug(f"Date parsing error for user {user.get('user_id')}: {e}")
+                    
+            except (ValueError, TypeError):
                 continue
         
         return {
@@ -339,15 +318,13 @@ def save_broadcast_stats(total_users, successful_sends, failed_sends):
     try:
         data = load_json_file(BROADCAST_STATS_FILE)
         
-        success_rate = (successful_sends / total_users * 100) if total_users > 0 else 0
-        
         broadcast_record = {
             "id": len(data["broadcasts"]) + 1,
             "total_users": total_users,
             "successful_sends": successful_sends,
             "failed_sends": failed_sends,
             "broadcast_date": datetime.now().isoformat(),
-            "success_rate": success_rate
+            "success_rate": (successful_sends / total_users * 100) if total_users > 0 else 0
         }
         
         data["broadcasts"].append(broadcast_record)
@@ -417,31 +394,21 @@ Verification pending...
 <blockquote><i>Note: For educational use only.</i></blockquote>
     """
 
-    try:
-        if WELCOME_PHOTO:
-            welcome_message = await update.message.reply_photo(
-                photo=WELCOME_PHOTO,
-                caption=caption,
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
-        else:
-            welcome_message = await update.message.reply_text(
-                caption,
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
-        
-        user_messages[user_id]['welcome_message'] = welcome_message.message_id
-    except Exception as e:
-        logger.error(f"Error sending welcome message: {e}")
-        # Fallback without photo
+    if WELCOME_PHOTO:
+        welcome_message = await update.message.reply_photo(
+            photo=WELCOME_PHOTO,
+            caption=caption,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+    else:
         welcome_message = await update.message.reply_text(
             caption,
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
-        user_messages[user_id]['welcome_message'] = welcome_message.message_id
+
+    user_messages[user_id]['welcome_message'] = welcome_message.message_id
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin panel command"""
@@ -452,14 +419,12 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     
     # Create admin keyboard
-    from telegram import ReplyKeyboardMarkup, KeyboardButton
-    
     keyboard = [
         ["📢 Broadcast", "👥 Total Users"],
         ["📊 User Analysis", "🚫 Ban User"],
         ["✅ Unban User", "🔙 Exit Admin"]
     ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     analytics = get_user_analytics()
     
@@ -476,6 +441,8 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 <b>Select an option from the menu below:</b>
     """
     
+    from telegram import ReplyKeyboardMarkup
+    
     await update.message.reply_text(
         admin_text,
         reply_markup=reply_markup,
@@ -490,10 +457,10 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
     if not is_admin(user_id):
         return
     
+    from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
+    
     if message_text == "📢 Broadcast":
         broadcast_states[user_id] = AdminState.BROADCAST_MESSAGE
-        
-        from telegram import ReplyKeyboardMarkup
         
         keyboard = [["❌ Cancel Broadcast"]]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -538,8 +505,6 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
     elif message_text == "🚫 Ban User":
         broadcast_states[user_id] = AdminState.BAN_USER
         
-        from telegram import ReplyKeyboardMarkup
-        
         keyboard = [["❌ Cancel"]]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         
@@ -553,8 +518,6 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
     
     elif message_text == "✅ Unban User":
         broadcast_states[user_id] = AdminState.UNBAN_USER
-        
-        from telegram import ReplyKeyboardMarkup
         
         keyboard = [["❌ Cancel"]]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -571,8 +534,6 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
         if user_id in broadcast_states:
             del broadcast_states[user_id]
         
-        from telegram import ReplyKeyboardRemove
-        
         await update.message.reply_text(
             "👋 Exited admin panel!",
             reply_markup=ReplyKeyboardRemove()
@@ -587,8 +548,7 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     if update.message.text == "❌ Cancel Broadcast":
         del broadcast_states[user_id]
-        from telegram import ReplyKeyboardRemove
-        await update.message.reply_text("❌ Broadcast cancelled!", reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text("❌ Broadcast cancelled!")
         return
     
     # Get all users
@@ -596,11 +556,6 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     total_users = len(users)
     successful_sends = 0
     failed_sends = 0
-    
-    if total_users == 0:
-        await update.message.reply_text("❌ No active users to broadcast to!")
-        del broadcast_states[user_id]
-        return
     
     # Progress message
     progress_msg = await update.message.reply_text(
@@ -619,25 +574,24 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 await context.bot.send_photo(
                     chat_id=target_user_id,
                     photo=update.message.photo[-1].file_id,
-                    caption=update.message.caption_html if update.message.caption_html else update.message.caption
+                    caption=update.message.caption
                 )
             elif update.message.video:
                 await context.bot.send_video(
                     chat_id=target_user_id,
                     video=update.message.video.file_id,
-                    caption=update.message.caption_html if update.message.caption_html else update.message.caption
+                    caption=update.message.caption
                 )
             elif update.message.document:
                 await context.bot.send_document(
                     chat_id=target_user_id,
                     document=update.message.document.file_id,
-                    caption=update.message.caption_html if update.message.caption_html else update.message.caption
+                    caption=update.message.caption
                 )
             else:
                 await context.bot.send_message(
                     chat_id=target_user_id,
-                    text=update.message.text,
-                    parse_mode='HTML' if update.message.parse_mode else None
+                    text=update.message.text
                 )
             
             successful_sends += 1
@@ -646,8 +600,8 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             failed_sends += 1
             logger.error(f"Failed to send broadcast to {target_user_id}: {e}")
         
-        # Update progress every 10 users या last user
-        if (i + 1) % 10 == 0 or i == len(users) - 1:
+        # Update progress every 50 users
+        if (i + 1) % 50 == 0 or i == len(users) - 1:
             progress = ((i + 1) / total_users) * 100
             try:
                 await progress_msg.edit_text(
@@ -658,31 +612,27 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     f"📊 Progress: {progress:.1f}%",
                     parse_mode='HTML'
                 )
-            except Exception as e:
-                logger.error(f"Error updating progress: {e}")
+            except:
+                pass
         
         # Small delay to avoid rate limiting
-        await asyncio.sleep(0.05)  # PythonAnywhere के लिए थोड़ा delay
+        await asyncio.sleep(0.1)
     
     # Save broadcast statistics
     save_broadcast_stats(total_users, successful_sends, failed_sends)
     
     # Final results
-    try:
-        await progress_msg.edit_text(
-            f"✅ <b>Broadcast Completed!</b>\n\n"
-            f"👥 Total Users: {total_users}\n"
-            f"✅ Successfully Sent: {successful_sends}\n"
-            f"❌ Failed: {failed_sends}\n"
-            f"📊 Success Rate: {(successful_sends/total_users*100):.1f}%",
-            parse_mode='HTML'
-        )
-    except:
-        pass
+    await progress_msg.edit_text(
+        f"✅ <b>Broadcast Completed!</b>\n\n"
+        f"👥 Total Users: {total_users}\n"
+        f"✅ Successfully Sent: {successful_sends}\n"
+        f"❌ Failed: {failed_sends}\n"
+        f"📊 Success Rate: {(successful_sends/total_users*100):.1f}%",
+        parse_mode='HTML'
+    )
     
     # Reset broadcast state
-    if user_id in broadcast_states:
-        del broadcast_states[user_id]
+    del broadcast_states[user_id]
     
     # Return to admin panel
     await admin_panel(update, context)
@@ -696,10 +646,8 @@ async def handle_ban_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     
     if message_text == "❌ Cancel":
-        if user_id in broadcast_states:
-            del broadcast_states[user_id]
-        from telegram import ReplyKeyboardRemove
-        await update.message.reply_text("❌ Operation cancelled!", reply_markup=ReplyKeyboardRemove())
+        del broadcast_states[user_id]
+        await update.message.reply_text("❌ Operation cancelled!")
         return
     
     try:
@@ -715,19 +663,15 @@ async def handle_ban_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     chat_id=target_user_id,
                     text="🚫 You have been banned from using this bot!"
                 )
-            except Exception as e:
-                logger.error(f"Could not notify banned user {target_user_id}: {e}")
+            except:
+                pass
             
-            from telegram import ReplyKeyboardRemove
             await update.message.reply_text(
-                f"✅ User {target_user_id} has been banned!",
-                reply_markup=ReplyKeyboardRemove()
+                f"✅ User {target_user_id} has been banned!"
             )
         else:
-            from telegram import ReplyKeyboardRemove
             await update.message.reply_text(
-                f"❌ User {target_user_id} not found in database!",
-                reply_markup=ReplyKeyboardRemove()
+                f"❌ User {target_user_id} not found in database!"
             )
         
     elif broadcast_states.get(user_id) == AdminState.UNBAN_USER:
@@ -737,32 +681,25 @@ async def handle_ban_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     chat_id=target_user_id,
                     text="✅ You have been unbanned! You can now use the bot again."
                 )
-            except Exception as e:
-                logger.error(f"Could not notify unbanned user {target_user_id}: {e}")
+            except:
+                pass
             
-            from telegram import ReplyKeyboardRemove
             await update.message.reply_text(
-                f"✅ User {target_user_id} has been unbanned!",
-                reply_markup=ReplyKeyboardRemove()
+                f"✅ User {target_user_id} has been unbanned!"
             )
         else:
-            from telegram import ReplyKeyboardRemove
             await update.message.reply_text(
-                f"❌ User {target_user_id} not found in database!",
-                reply_markup=ReplyKeyboardRemove()
+                f"❌ User {target_user_id} not found in database!"
             )
     
     # Reset state
-    if user_id in broadcast_states:
-        del broadcast_states[user_id]
+    del broadcast_states[user_id]
 
 async def check_channel_membership(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """Check if user has joined all required channels using channel IDs"""
     try:
         for channel in CHANNELS:
             try:
-                # PythonAnywhere पर bot.get_chat_member काम नहीं कर सकता
-                # इसलिए हम एक simple check करेंगे
                 member = await context.bot.get_chat_member(channel['id'], user_id)
                 if member.status in ['left', 'kicked']:
                     logger.info(f"User {user_id} not in channel {channel['name']}")
@@ -770,16 +707,11 @@ async def check_channel_membership(user_id: int, context: ContextTypes.DEFAULT_T
                 logger.info(f"User {user_id} found in channel {channel['name']} with status: {member.status}")
             except Exception as e:
                 logger.error(f"Error checking membership for channel {channel['name']}: {e}")
-                # PythonAnywhere पर, हम थोड़ा relaxed check करेंगे
-                # आप चाहें तो False return कर सकते हैं
-                # return False
-                # Temporary के लिए True return कर रहे हैं
-                continue
+                return False
         return True
     except Exception as e:
         logger.error(f"Error in check_channel_membership: {e}")
-        # PythonAnywhere के लिए, testing के time पर True return करें
-        return True
+        return False
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle inline keyboard callbacks"""
@@ -830,8 +762,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             keyboard.append([InlineKeyboardButton("✅ Joined All Channels", callback_data="joined_all")])
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            await query.edit_message_caption(
-                caption="❌ **Please join all channels first!** \n\nMake sure you've joined ALL required channels before clicking the button below.\n\nClick the channel buttons above to join them!",
+            await query.edit_message_text(
+                "❌ **Please join all channels first!** \n\nMake sure you've joined ALL required channels before clicking the button below.\n\nClick the channel buttons above to join them!",
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
@@ -852,8 +784,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
             await show_main_menu(query, context)
         else:
-            await query.edit_message_caption(
-                caption="❌ Please complete the previous steps first!",
+            await query.edit_message_text(
+                "❌ Please complete the previous steps first!",
                 parse_mode='Markdown'
             )
 
@@ -864,8 +796,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_caption(
-            caption="❌ **You must agree to terms to use this bot!**\n\nPlease read the terms carefully and agree to continue.",
+        await query.edit_message_text(
+            "❌ **You must agree to terms to use this bot!**\n\nPlease read the terms carefully and agree to continue.",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
@@ -907,17 +839,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             }
             await handle_hack_option(update, context, hack_type_map[message_text])
         else:
-            await update.message.reply_text("❌ Please complete the setup process first! Use /start to begin.")
+            await update.message.reply_text("❌ Please complete the setup process first! or /start again the bot!")
     
     elif message_text == "🔙 Back to Menu":
         if user_states.get(user_id) == UserState.MAIN_MENU:
             await show_main_menu(update, context)
-    else:
-        # If user sends other text, guide them
-        if user_states.get(user_id) == UserState.MAIN_MENU:
-            await update.message.reply_text("Please select an option from the menu above.")
-        else:
-            await update.message.reply_text("Please use /start to begin.")
+            
+    elif not is_admin(user_id):
+        # Handle other messages for regular users
+        await update.message.reply_text("❌ Please use the menu buttons or /start the bot!")
 
 async def show_terms_and_conditions(query, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show terms and conditions with inline keyboard"""
@@ -943,52 +873,39 @@ You <b>must not</b> use this tool to access any account without proper permissio
 Misuse may result in <u>legal actions</u>, permanent bans 🚫, or other consequences.  
 Using this bot means you have <b>read and accepted</b> all the above terms.</i>"""
     
-    try:
-        if WARNING_PHOTO:
-            terms_message = await context.bot.send_photo(
-                chat_id=query.message.chat_id,
-                photo=WARNING_PHOTO,
-                caption=caption,
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
-        else:
-            terms_message = await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text=caption,
-                reply_markup=reply_markup,
-                parse_mode='HTML'
-            )
-        
-        if user_id not in user_messages:
-            user_messages[user_id] = {}
-        user_messages[user_id]['terms_message'] = terms_message.message_id
-    except Exception as e:
-        logger.error(f"Error sending terms message: {e}")
-        # Fallback
+    if WARNING_PHOTO:
+        terms_message = await context.bot.send_photo(
+            chat_id=query.message.chat_id,
+            photo=WARNING_PHOTO,
+            caption=caption,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+    else:
         terms_message = await context.bot.send_message(
             chat_id=query.message.chat_id,
             text=caption,
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
-        if user_id not in user_messages:
-            user_messages[user_id] = {}
-        user_messages[user_id]['terms_message'] = terms_message.message_id
+    
+    if user_id not in user_messages:
+        user_messages[user_id] = {}
+    user_messages[user_id]['terms_message'] = terms_message.message_id
 
 async def show_main_menu(query_or_update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show main hacking menu"""
-    from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
+    from telegram import ReplyKeyboardMarkup
     
     reply_keyboard = [
         ["📷 Camera Hack", "📱 Instagram Hack"],
         ["📘 Facebook Hack", "👻 Snapchat Hack"],
-        ["👨‍💻 Developer"]
+         ["👨‍💻 Developer"]
     ]
     keyboard_markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True, one_time_keyboard=False)
     
     caption = """
-<b>🎯 HackVerse OS - Main Interface</b>
+<b>🎯 Phishing Page - Main Interface</b>
 
 Welcome, operator. Choose your target module:  
 📷 Camera | 📱 Instagram | 📘 Facebook | 👻 Snapchat
@@ -998,40 +915,26 @@ Each tool will generate a unique link for deployment.
 <blockquote><i>Note: For educational use only.</i></blockquote>
     """
     
-    try:
-        if hasattr(query_or_update, 'message'):
-            await context.bot.send_message(
-                chat_id=query_or_update.message.chat_id,
-                text=caption,
-                reply_markup=keyboard_markup,
-                parse_mode='HTML'
-            )
-        else:
-            await query_or_update.message.reply_text(
-                caption,
-                reply_markup=keyboard_markup,
-                parse_mode='HTML'
-            )
-    except Exception as e:
-        logger.error(f"Error showing main menu: {e}")
-        # Fallback without keyboard
-        if hasattr(query_or_update, 'message'):
-            await context.bot.send_message(
-                chat_id=query_or_update.message.chat_id,
-                text=caption,
-                parse_mode='HTML'
-            )
-        else:
-            await query_or_update.message.reply_text(
-                caption,
-                parse_mode='HTML'
-            )
+    if hasattr(query_or_update, 'callback_query'):
+        # Called from callback query
+        await context.bot.send_message(
+            chat_id=query_or_update.callback_query.message.chat_id,
+            text=caption,
+            reply_markup=keyboard_markup,
+            parse_mode='HTML'
+        )
+    else:
+        # Called from update
+        await query_or_update.message.reply_text(
+            caption,
+            reply_markup=keyboard_markup,
+            parse_mode='HTML'
+        )
 
 async def handle_hack_option(update: Update, context: ContextTypes.DEFAULT_TYPE, hack_type: str) -> None:
     user_id = update.effective_user.id
 
     from telegram import ReplyKeyboardMarkup
-    
     reply_keyboard = [["🔙 Back to Menu"]]
     keyboard_markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True, one_time_keyboard=False)
 
@@ -1144,117 +1047,37 @@ Any type of Telegram bot can be developed on request.
     else:
         caption = "❌ Invalid hack type."
 
-    try:
-        await update.message.reply_text(
-            caption,
-            reply_markup=keyboard_markup,
-            parse_mode='HTML'
-        )
-    except Exception as e:
-        logger.error(f"Error sending hack option: {e}")
-        await update.message.reply_text(
-            "Error loading tool. Please try again.",
-            reply_markup=keyboard_markup
-        )
+    await update.message.reply_text(
+        caption,
+        reply_markup=keyboard_markup,
+        parse_mode='HTML'
+    )
 
-def cleanup_old_data():
-    """Cleanup old data to save memory on PythonAnywhere"""
-    try:
-        data = load_json_file(USERS_DB_FILE)
-        
-        # Remove users who haven't been active for 30 days
-        cutoff_date = datetime.now() - timedelta(days=30)
-        users_to_remove = []
-        
-        for user_id_str, user_data in data["users"].items():
-            try:
-                last_activity_str = user_data.get("last_activity", "")
-                if last_activity_str:
-                    last_activity = datetime.fromisoformat(last_activity_str)
-                    if last_activity < cutoff_date:
-                        users_to_remove.append(user_id_str)
-            except:
-                continue
-        
-        for user_id_str in users_to_remove:
-            del data["users"][user_id_str]
-        
-        if users_to_remove:
-            data["metadata"]["last_updated"] = datetime.now().isoformat()
-            save_json_file(USERS_DB_FILE, data)
-            logger.info(f"Cleaned up {len(users_to_remove)} inactive users")
-    
-    except Exception as e:
-        logger.error(f"Error in cleanup: {e}")
-
-async def post_init(application: Application) -> None:
-    """Post initialization tasks"""
-    logger.info("Bot initialization completed")
-    cleanup_old_data()
-
-async def post_stop(application: Application) -> None:
-    """Cleanup tasks before bot stops"""
-    logger.info("Bot is shutting down...")
-
-def main() -> None:
+async def main() -> None:
     """Start the bot"""
     # Initialize JSON database
     init_database()
     
-    try:
-        # Create the Application
-        application = Application.builder() \
-            .token(BOT_TOKEN) \
-            .post_init(post_init) \
-            .post_stop(post_stop) \
-            .build()
+    # Create the Application
+    application = Application.builder().token(BOT_TOKEN).build()
 
-        # Add handlers
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("admin", admin_panel))
-        application.add_handler(CommandHandler("help", start))
-        application.add_handler(CallbackQueryHandler(handle_callback_query))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        application.add_handler(
-            MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, handle_message)
-        )
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("admin", admin_panel))
+    application.add_handler(CallbackQueryHandler(handle_callback_query))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(
+        MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, handle_message)
+    )
 
-        # PythonAnywhere के लिए optimized settings
-        print("=" * 50)
-        print("🚀 HackVerse OS Bot - PythonAnywhere Edition")
-        print("=" * 50)
-        print(f"🤖 Bot Token: {BOT_TOKEN[:10]}...")
-        print(f"📊 Admin IDs: {ADMIN_USER_IDS}")
-        print(f"📁 Data Directory: {data_dir}")
-        print(f"📄 Log File: {log_file}")
-        print("=" * 50)
-        
-        # Start polling with optimized settings for PythonAnywhere
-        application.run_polling(
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True,
-            timeout=30,
-            pool_timeout=30,
-            read_timeout=30,
-            write_timeout=30,
-            connect_timeout=30,
-            close_timeout=30
-        )
-        
-    except Exception as e:
-        logger.error(f"Failed to start bot: {e}")
-        print(f"❌ Critical Error: {e}")
-        print("\n💡 Possible Solutions:")
-        print("1. Check if BOT_TOKEN is valid")
-        print("2. Install dependencies: pip install python-telegram-bot==20.7")
-        print("3. Check PythonAnywhere console for details")
+    # Run the bot
+    print("🚀 HackVerse OS Bot with JSON Database is starting...")
+    print(f"🤖 Bot Token: {BOT_TOKEN[:10]}...")
+    print(f"📊 Admin IDs: {ADMIN_USER_IDS}")
+    print("✅ Bot is running on Render...")
+    
+    await application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 if __name__ == '__main__':
-    # PythonAnywhere के लिए extra check
-    print("PythonAnywhere Environment Check:")
-    print(f"Python Version: {sys.version}")
-    print(f"Working Directory: {os.getcwd()}")
-    print(f"Files in directory: {os.listdir('.')}")
-    
-    # Run the bot
-    main()
+    # For Render deployment
+    asyncio.run(main())
