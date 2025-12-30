@@ -3,7 +3,7 @@ import json
 import os
 import asyncio
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from telegram.constants import ParseMode
 
@@ -34,7 +34,7 @@ CHANNELS = [
     }
 ]
 
-# Photo URLs - Replace with your actual photo URLs
+# Photo URLs
 WELCOME_PHOTO = None
 WARNING_PHOTO = None
 
@@ -441,8 +441,6 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 <b>Select an option from the menu below:</b>
     """
     
-    from telegram import ReplyKeyboardMarkup
-    
     await update.message.reply_text(
         admin_text,
         reply_markup=reply_markup,
@@ -456,8 +454,6 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
     
     if not is_admin(user_id):
         return
-    
-    from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
     
     if message_text == "📢 Broadcast":
         broadcast_states[user_id] = AdminState.BROADCAST_MESSAGE
@@ -548,7 +544,7 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     if update.message.text == "❌ Cancel Broadcast":
         del broadcast_states[user_id]
-        await update.message.reply_text("❌ Broadcast cancelled!")
+        await update.message.reply_text("❌ Broadcast cancelled!", reply_markup=ReplyKeyboardRemove())
         return
     
     # Get all users
@@ -647,7 +643,7 @@ async def handle_ban_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     if message_text == "❌ Cancel":
         del broadcast_states[user_id]
-        await update.message.reply_text("❌ Operation cancelled!")
+        await update.message.reply_text("❌ Operation cancelled!", reply_markup=ReplyKeyboardRemove())
         return
     
     try:
@@ -667,11 +663,13 @@ async def handle_ban_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 pass
             
             await update.message.reply_text(
-                f"✅ User {target_user_id} has been banned!"
+                f"✅ User {target_user_id} has been banned!",
+                reply_markup=ReplyKeyboardRemove()
             )
         else:
             await update.message.reply_text(
-                f"❌ User {target_user_id} not found in database!"
+                f"❌ User {target_user_id} not found in database!",
+                reply_markup=ReplyKeyboardRemove()
             )
         
     elif broadcast_states.get(user_id) == AdminState.UNBAN_USER:
@@ -685,11 +683,13 @@ async def handle_ban_unban(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 pass
             
             await update.message.reply_text(
-                f"✅ User {target_user_id} has been unbanned!"
+                f"✅ User {target_user_id} has been unbanned!",
+                reply_markup=ReplyKeyboardRemove()
             )
         else:
             await update.message.reply_text(
-                f"❌ User {target_user_id} not found in database!"
+                f"❌ User {target_user_id} not found in database!",
+                reply_markup=ReplyKeyboardRemove()
             )
     
     # Reset state
@@ -723,8 +723,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     
     # Check if user is banned
     if is_user_banned(user_id):
-        await query.edit_message_caption(
-            caption="❌ You are banned from using this bot!",
+        await query.edit_message_text(
+            text="❌ You are banned from using this bot!",
             parse_mode='HTML'
         )
         return
@@ -763,7 +763,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await query.edit_message_text(
-                "❌ **Please join all channels first!** \n\nMake sure you've joined ALL required channels before clicking the button below.\n\nClick the channel buttons above to join them!",
+                text="❌ **Please join all channels first!** \n\nMake sure you've joined ALL required channels before clicking the button below.\n\nClick the channel buttons above to join them!",
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
@@ -785,7 +785,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await show_main_menu(query, context)
         else:
             await query.edit_message_text(
-                "❌ Please complete the previous steps first!",
+                text="❌ Please complete the previous steps first!",
                 parse_mode='Markdown'
             )
 
@@ -797,7 +797,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await query.edit_message_text(
-            "❌ **You must agree to terms to use this bot!**\n\nPlease read the terms carefully and agree to continue.",
+            text="❌ **You must agree to terms to use this bot!**\n\nPlease read the terms carefully and agree to continue.",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
@@ -895,8 +895,6 @@ Using this bot means you have <b>read and accepted</b> all the above terms.</i>"
 
 async def show_main_menu(query_or_update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show main hacking menu"""
-    from telegram import ReplyKeyboardMarkup
-    
     reply_keyboard = [
         ["📷 Camera Hack", "📱 Instagram Hack"],
         ["📘 Facebook Hack", "👻 Snapchat Hack"],
@@ -934,7 +932,6 @@ Each tool will generate a unique link for deployment.
 async def handle_hack_option(update: Update, context: ContextTypes.DEFAULT_TYPE, hack_type: str) -> None:
     user_id = update.effective_user.id
 
-    from telegram import ReplyKeyboardMarkup
     reply_keyboard = [["🔙 Back to Menu"]]
     keyboard_markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True, one_time_keyboard=False)
 
@@ -1053,31 +1050,39 @@ Any type of Telegram bot can be developed on request.
         parse_mode='HTML'
     )
 
-async def main() -> None:
+def main() -> None:
     """Start the bot"""
     # Initialize JSON database
     init_database()
     
-    # Create the Application
-    application = Application.builder().token(BOT_TOKEN).build()
+    try:
+        # Create the Application
+        application = Application.builder().token(BOT_TOKEN).build()
 
-    # Add handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("admin", admin_panel))
-    application.add_handler(CallbackQueryHandler(handle_callback_query))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(
-        MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, handle_message)
-    )
+        # Add handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("admin", admin_panel))
+        application.add_handler(CallbackQueryHandler(handle_callback_query))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_handler(
+            MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, handle_message)
+        )
 
-    # Run the bot
-    print("🚀 HackVerse OS Bot with JSON Database is starting...")
-    print(f"🤖 Bot Token: {BOT_TOKEN[:10]}...")
-    print(f"📊 Admin IDs: {ADMIN_USER_IDS}")
-    print("✅ Bot is running on Render...")
-    
-    await application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+        # Run the bot
+        print("🚀 HackVerse OS Bot with JSON Database is starting...")
+        print(f"🤖 Bot Token: {BOT_TOKEN[:10]}...")
+        print(f"📊 Admin IDs: {ADMIN_USER_IDS}")
+        print("✅ Bot is running on Render...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+        
+    except Exception as e:
+        logger.error(f"Failed to start bot: {e}")
+        print(f"❌ Critical Error: {e}")
+        print("\n💡 Possible Solutions:")
+        print("1. Check if BOT_TOKEN is valid")
+        print("2. Install dependencies: pip install python-telegram-bot==20.7")
+        print("3. Check channel IDs are valid Telegram channel IDs")
+        raise
 
 if __name__ == '__main__':
-    # For Render deployment
-    asyncio.run(main())
+    main()
