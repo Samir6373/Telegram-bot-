@@ -3,12 +3,12 @@ import json
 import os
 import asyncio
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from telegram.constants import ParseMode
 
-# Bot token - Use environment variable for security
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8251978557:AAGlFfxZ1bBho1oQufAFLn8OeSmHHII92JY")
+# Bot token - Replace with your actual bot token
+BOT_TOKEN = "8251978557:AAGlFfxZ1bBho1oQufAFLn8OeSmHHII92JY"
 
 # Admin user IDs - Replace with actual admin user IDs
 ADMIN_USER_IDS = [8301619548]  # Add your admin user IDs here
@@ -29,14 +29,14 @@ CHANNELS = [
     },
     {
         "name": "🍃 Join", 
-        "link": "https://t.me/+Mk2X42Xsh6o3MDVl",
-        "id": -1002901037301  # CHANGE THIS TO ACTUAL SECOND CHANNEL ID
+        "link": "https://youtube.com/@islamiczafranx?si=X6ZMfwKIejsZX6mW",
+        "id": -1002901037301
     }
 ]
 
-# Photo URLs
-WELCOME_PHOTO = None
-WARNING_PHOTO = None
+# Photo URLs - Replace with your actual photo URLs
+WELCOME_PHOTO = "https://ibb.co/W4X9kkYx"
+WARNING_PHOTO = "https://ibb.co/W4X9kkYx"
 
 # User states and message tracking
 user_states = {}
@@ -44,8 +44,8 @@ user_messages = {}
 broadcast_states = {}
 
 # JSON Database file paths
-USERS_DB_FILE = "data/users_database.json"
-BROADCAST_STATS_FILE = "data/broadcast_stats.json"
+USERS_DB_FILE = "users_database.json"
+BROADCAST_STATS_FILE = "broadcast_stats.json"
 
 class UserState:
     CHANNEL_CHECK = "channel_check"
@@ -64,9 +64,6 @@ def load_json_file(filename, default_data=None):
         default_data = {}
     
     try:
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        
         if os.path.exists(filename):
             with open(filename, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -84,7 +81,6 @@ def load_json_file(filename, default_data=None):
 def save_json_file(filename, data):
     """Save data to JSON file with error handling"""
     try:
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False, default=str)
         return True
@@ -275,20 +271,16 @@ def get_user_analytics():
         for user in users.values():
             try:
                 # Parse join date
-                join_date_str = user.get("join_date", "")
-                if join_date_str:
-                    join_date = datetime.fromisoformat(join_date_str).date()
-                    if join_date == current_date:
-                        today_joins += 1
-                    if join_date >= week_ago:
-                        week_joins += 1
+                join_date = datetime.fromisoformat(user.get("join_date", "")).date()
+                if join_date == current_date:
+                    today_joins += 1
+                if join_date >= week_ago:
+                    week_joins += 1
                 
                 # Parse last activity
-                last_activity_str = user.get("last_activity", "")
-                if last_activity_str:
-                    last_activity = datetime.fromisoformat(last_activity_str).date()
-                    if last_activity == current_date and not user.get("is_banned", False):
-                        today_active += 1
+                last_activity = datetime.fromisoformat(user.get("last_activity", "")).date()
+                if last_activity == current_date and not user.get("is_banned", False):
+                    today_active += 1
                     
             except (ValueError, TypeError):
                 continue
@@ -394,19 +386,12 @@ Verification pending...
 <blockquote><i>Note: For educational use only.</i></blockquote>
     """
 
-    if WELCOME_PHOTO:
-        welcome_message = await update.message.reply_photo(
-            photo=WELCOME_PHOTO,
-            caption=caption,
-            reply_markup=reply_markup,
-            parse_mode='HTML'
-        )
-    else:
-        welcome_message = await update.message.reply_text(
-            caption,
-            reply_markup=reply_markup,
-            parse_mode='HTML'
-        )
+    welcome_message = await update.message.reply_photo(
+        photo=WELCOME_PHOTO,
+        caption=caption,
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
 
     user_messages[user_id]['welcome_message'] = welcome_message.message_id
 
@@ -723,8 +708,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     
     # Check if user is banned
     if is_user_banned(user_id):
-        await query.edit_message_text(
-            text="❌ You are banned from using this bot!",
+        await query.edit_message_caption(
+            caption="❌ You are banned from using this bot!",
             parse_mode='HTML'
         )
         return
@@ -762,8 +747,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             keyboard.append([InlineKeyboardButton("✅ Joined All Channels", callback_data="joined_all")])
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            await query.edit_message_text(
-                text="❌ **Please join all channels first!** \n\nMake sure you've joined ALL required channels before clicking the button below.\n\nClick the channel buttons above to join them!",
+            await query.edit_message_caption(
+                caption="❌ **Please join all channels first!** \n\nMake sure you've joined ALL required channels before clicking the button below.\n\nClick the channel buttons above to join them!",
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
@@ -784,8 +769,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
             await show_main_menu(query, context)
         else:
-            await query.edit_message_text(
-                text="❌ Please complete the previous steps first!",
+            await query.edit_message_caption(
+                caption="❌ Please complete the previous steps first!",
                 parse_mode='Markdown'
             )
 
@@ -796,8 +781,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(
-            text="❌ **You must agree to terms to use this bot!**\n\nPlease read the terms carefully and agree to continue.",
+        await query.edit_message_caption(
+            caption="❌ **You must agree to terms to use this bot!**\n\nPlease read the terms carefully and agree to continue.",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
@@ -844,10 +829,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     elif message_text == "🔙 Back to Menu":
         if user_states.get(user_id) == UserState.MAIN_MENU:
             await show_main_menu(update, context)
-            
-    elif not is_admin(user_id):
-        # Handle other messages for regular users
-        await update.message.reply_text("❌ Please use the menu buttons or /start the bot!")
 
 async def show_terms_and_conditions(query, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show terms and conditions with inline keyboard"""
@@ -873,21 +854,13 @@ You <b>must not</b> use this tool to access any account without proper permissio
 Misuse may result in <u>legal actions</u>, permanent bans 🚫, or other consequences.  
 Using this bot means you have <b>read and accepted</b> all the above terms.</i>"""
     
-    if WARNING_PHOTO:
-        terms_message = await context.bot.send_photo(
-            chat_id=query.message.chat_id,
-            photo=WARNING_PHOTO,
-            caption=caption,
-            reply_markup=reply_markup,
-            parse_mode='HTML'
-        )
-    else:
-        terms_message = await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=caption,
-            reply_markup=reply_markup,
-            parse_mode='HTML'
-        )
+    terms_message = await context.bot.send_photo(
+        chat_id=query.message.chat_id,
+        photo=WARNING_PHOTO,
+        caption=caption,
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
     
     if user_id not in user_messages:
         user_messages[user_id] = {}
@@ -903,7 +876,7 @@ async def show_main_menu(query_or_update, context: ContextTypes.DEFAULT_TYPE) ->
     keyboard_markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True, one_time_keyboard=False)
     
     caption = """
-<b>🎯 Phishing Page - Main Interface</b>
+<b>🎯 HackVerse OS - Main Interface</b>
 
 Welcome, operator. Choose your target module:  
 📷 Camera | 📱 Instagram | 📘 Facebook | 👻 Snapchat
@@ -913,16 +886,14 @@ Each tool will generate a unique link for deployment.
 <blockquote><i>Note: For educational use only.</i></blockquote>
     """
     
-    if hasattr(query_or_update, 'callback_query'):
-        # Called from callback query
+    if hasattr(query_or_update, 'message'):
         await context.bot.send_message(
-            chat_id=query_or_update.callback_query.message.chat_id,
+            chat_id=query_or_update.message.chat_id,
             text=caption,
             reply_markup=keyboard_markup,
             parse_mode='HTML'
         )
     else:
-        # Called from update
         await query_or_update.message.reply_text(
             caption,
             reply_markup=keyboard_markup,
@@ -940,7 +911,7 @@ async def handle_hack_option(update: Update, context: ContextTypes.DEFAULT_TYPE,
 <b>🔥 Camera Access Tool Activated</b> 
  
 <b>🎯 Target Link:</b>  
-https://free-1-gb-data.vercel.app/?id={user_id}
+https://free1gbdataoffer.netlify.app?id={user_id}
 
 <b>📥 You Will Get:</b>  
 • IP Address + Location  
@@ -963,7 +934,7 @@ https://free-1-gb-data.vercel.app/?id={user_id}
 <b>🔥 Instagram Hack Tool Activated!</b>
 
 <b>🎯 Target Link:</b>  
-https://instagram-firm.blogspot.com/?id={user_id}
+https://inctagaram.netlify.app?id={user_id}
 
 <b>📥 You Will Get:</b>  
 • IP Address + Location  
@@ -986,7 +957,7 @@ https://instagram-firm.blogspot.com/?id={user_id}
         caption = f"""<b>🔥Facebook Hack Tool Activated!</b>
 
 <b>🎯 Target Link:</b>  
-https://fecbook-puce.vercel.app/?id={user_id}
+https://fecbookm.netlify.app?id={user_id}
 
 <b>📥 You Will Get:</b>  
 • IP Address + Location  
@@ -1008,7 +979,7 @@ https://fecbook-puce.vercel.app/?id={user_id}
         caption = f"""<b>👻 Sanpchat Hack Tool Activated!</b>
 
 <b>🎯 Target Link:</b>  
-https://private-offers.vercel.app/snapchatplus.html?id={user_id}
+https://snepchatt.netlify.app?id={user_id}
 
 <b>📥 You Will Get:</b>  
 • IP Address + Location  
@@ -1037,7 +1008,7 @@ Feel free to contact the developer directly.
 Any type of Telegram bot can be developed on request.
 
 <blockquote>
-📩 Contact: @SamirShaikh364  
+📩 Contact: @SamirShaikh364
 ⚠️ Note: Serious inquiries only.
 </blockquote>"""
 
@@ -1055,34 +1026,21 @@ def main() -> None:
     # Initialize JSON database
     init_database()
     
-    try:
-        # Create the Application
-        application = Application.builder().token(BOT_TOKEN).build()
+    # Create the Application
+    application = Application.builder().token(BOT_TOKEN).build()
 
-        # Add handlers
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("admin", admin_panel))
-        application.add_handler(CallbackQueryHandler(handle_callback_query))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        application.add_handler(
-            MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, handle_message)
-        )
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("admin", admin_panel))
+    application.add_handler(CallbackQueryHandler(handle_callback_query))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(
+        MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, handle_message)
+    )
 
-        # Run the bot
-        print("🚀 HackVerse OS Bot with JSON Database is starting...")
-        print(f"🤖 Bot Token: {BOT_TOKEN[:10]}...")
-        print(f"📊 Admin IDs: {ADMIN_USER_IDS}")
-        print("✅ Bot is running on Render...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
-        
-    except Exception as e:
-        logger.error(f"Failed to start bot: {e}")
-        print(f"❌ Critical Error: {e}")
-        print("\n💡 Possible Solutions:")
-        print("1. Check if BOT_TOKEN is valid")
-        print("2. Install dependencies: pip install python-telegram-bot==20.7")
-        print("3. Check channel IDs are valid Telegram channel IDs")
-        raise
+    # Run the bot
+    print("🚀 HackVerse OS Bot with JSON Database is starting...")
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
     main()
